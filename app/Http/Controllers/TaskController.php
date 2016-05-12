@@ -9,7 +9,6 @@ use App\Http\Controllers\Controller;
 
 use App\Task;
 use App\Repositories\TaskRepository;
-
 class TaskController extends Controller
 {
     /**
@@ -59,6 +58,7 @@ class TaskController extends Controller
 
         $request->user()->tasks()->create([
             'name' => $request->name,
+            'is_done' => '0',
         ]);
 
         return redirect('/tasks');
@@ -76,6 +76,34 @@ class TaskController extends Controller
         $this->authorize('destroy', $task);
 
         $task->delete();
+
+        return redirect('/tasks');
+    }
+
+    /**
+     * when the done button is clicked it goes to done tasks.
+     *
+     * @param Request $request
+     * @param Task $task
+     * @return Response
+     */
+    public function task_done(Request $request, Task $task){
+        $task->is_done = '1';
+        $task->save();
+
+        return redirect('/tasks');
+    }
+
+    /**
+     * when the done button is clicked it goes to done tasks.
+     *
+     * @param Request $request
+     * @param Task $task
+     * @return Response
+     */
+    public function task_todo(Request $request, Task $task){
+        $task->is_done = '0';
+        $task->save();
 
         return redirect('/tasks');
     }

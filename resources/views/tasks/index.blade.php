@@ -12,11 +12,11 @@
                     <!-- Display Validation Errors -->
                     @include('common.errors')
 
-                    <!-- New Task Form -->
+                            <!-- New Task Form -->
                     <form action="/task" method="POST" class="form-horizontal">
                         {{ csrf_field() }}
 
-                        <!-- Task Name -->
+                                <!-- Task Name -->
                         <div class="form-group">
                             <label for="task-name" class="col-sm-3 control-label">Task</label>
 
@@ -41,17 +41,18 @@
             @if (count($tasks) > 0)
                 <div class="panel panel-default">
                     <div class="panel-heading">
-                        Current Tasks
+                        Todo Tasks
                     </div>
 
                     <div class="panel-body">
-                        <table class="table table-striped task-table">
+                        <table class="table task-table">
                             <thead>
-                                <th>Task</th>
-                                <th>&nbsp;</th>
+                            <th>Task</th>
+                            <th>&nbsp;</th>
                             </thead>
                             <tbody>
-                                @foreach ($tasks as $task)
+                            @foreach ($tasks as $task)
+                                @if($task->is_done == 0)
                                     <tr>
                                         <td class="table-text"><div>{{ $task->name }}</div></td>
 
@@ -64,10 +65,50 @@
                                                 <button type="submit" id="delete-task-{{ $task->id }}" class="btn btn-danger">
                                                     <i class="fa fa-btn fa-trash"></i>Delete
                                                 </button>
+                                                <a href="/task_done/{{ $task->id }}" class="btn btn-success">Done</a>
+
                                             </form>
                                         </td>
                                     </tr>
-                                @endforeach
+                                @endif
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        Done Tasks
+                    </div>
+
+                    <div class="panel-body">
+                        <table class="table task-table">
+                            <thead>
+                            <th>Task</th>
+                            <th>&nbsp;</th>
+                            </thead>
+                            <tbody>
+                            @foreach ($tasks as $task)
+                                @if($task->is_done == 1)
+                                    <tr>
+                                        <td class="table-text"><div>{{ $task->name }}</div></td>
+
+                                        <!-- Task Delete Button -->
+                                        <td>
+                                            <form action="/task/{{ $task->id }}" method="POST">
+                                                {{ csrf_field() }}
+                                                {{ method_field('DELETE') }}
+
+                                                <button type="submit" id="delete-task-{{ $task->id }}" class="btn btn-danger">
+                                                    <i class="fa fa-btn fa-trash"></i>Delete
+                                                </button>
+                                                <a href="/task_todo/{{ $task->id }}" class="btn btn-success">Todo</a>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endif
+                            @endforeach
                             </tbody>
                         </table>
                     </div>
