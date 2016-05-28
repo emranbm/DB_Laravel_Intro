@@ -14,4 +14,7 @@
         </div>
     </div>
 </div>
+<div>
+	Copyright by emran and sajad.
+</div>
 @endsection
