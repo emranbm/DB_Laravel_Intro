@@ -54,11 +54,11 @@
                                     </div>
                                     <div class="col-sm-3">
                                         <label for="task-start_time_month" class="col-sm-3 control-label">Month</label>
-                                        <input type="number" max="12" min="1" name="month" id="task-start_time_month" class="form-control" value="6">
+                                        <input type="number" max="12" min="1" name="month" id="task-start_time_month" class="form-control" value="3">
                                     </div>
                                     <div class="col-sm-3">
                                         <label for="task-start_time_day" class="col-sm-3 control-label">Day</label>
-                                        <input type="number" max="31" min="1" name="day" id="task-start_time_day" class="form-control" value="1">
+                                        <input type="number" max="31" min="1" name="day" id="task-start_time_day" class="form-control" value="15">
                                     </div>
                                 </div>
                             </div>
@@ -69,7 +69,7 @@
                             <label for="task-time_estimation" class="col-sm-3 control-label">Time estimation (day) : </label>
 
                             <div class="col-sm-3">
-                                <input type="number" min="0" name="time_estimation" id="task-time_estimation" class="form-control" value="{{ old('task') }}">
+                                <input type="number" min="0" name="time_estimation" id="task-time_estimation" class="form-control">
                             </div>
 
                         </div>
