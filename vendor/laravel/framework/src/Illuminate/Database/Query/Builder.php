@@ -8,6 +8,7 @@ use BadMethodCallException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Illuminate\Support\Collection;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Traits\Macroable;
 use Illuminate\Contracts\Support\Arrayable;
@@ -213,12 +214,12 @@ class Builder
      * @return void
      */
     public function __construct(ConnectionInterface $connection,
-                                Grammar $grammar,
-                                Processor $processor)
+                                Grammar $grammar = null,
+                                Processor $processor = null)
     {
-        $this->grammar = $grammar;
-        $this->processor = $processor;
         $this->connection = $connection;
+        $this->grammar = $grammar ?: $connection->getQueryGrammar();
+        $this->processor = $processor ?: $connection->getPostProcessor();
     }
 
     /**
@@ -436,6 +437,44 @@ class Builder
     }
 
     /**
+     * Add a "cross join" clause to the query.
+     *
+     * @param  string  $table
+     * @param  string  $first
+     * @param  string  $operator
+     * @param  string  $second
+     * @return \Illuminate\Database\Query\Builder|static
+     */
+    public function crossJoin($table, $first = null, $operator = null, $second = null)
+    {
+        if ($first) {
+            return $this->join($table, $first, $operator, $second, 'cross');
+        }
+
+        $this->joins[] = new JoinClause('cross', $table);
+
+        return $this;
+    }
+
+    /**
+     * Apply the callback's query changes if the given "value" is true.
+     *
+     * @param  bool  $value
+     * @param  \Closure  $callback
+     * @return \Illuminate\Database\Query\Builder
+     */
+    public function when($value, $callback)
+    {
+        $builder = $this;
+
+        if ($value) {
+            $builder = call_user_func($callback, $builder);
+        }
+
+        return $builder;
+    }
+
+    /**
      * Add a basic where clause to the query.
      *
      * @param  string|array|\Closure  $column
@@ -474,7 +513,8 @@ class Builder
         // If the given operator is not found in the list of valid operators we will
         // assume that the developer is just short-cutting the '=' operators and
         // we will set the operators to '=' and set the values appropriately.
-        if (! in_array(strtolower($operator), $this->operators, true)) {
+        if (! in_array(strtolower($operator), $this->operators, true) &&
+            ! in_array(strtolower($operator), $this->grammar->getOperators(), true)) {
             list($value, $operator) = [$operator, '='];
         }
 
@@ -497,6 +537,10 @@ class Builder
         // will be bound to each SQL statements when it is finally executed.
         $type = 'Basic';
 
+        if (Str::contains($column, '->') && is_bool($value)) {
+            $value = new Expression($value ? 'true' : 'false');
+        }
+
         $this->wheres[] = compact('type', 'column', 'operator', 'value', 'boolean');
 
         if (! $value instanceof Expression) {
@@ -511,19 +555,34 @@ class Builder
      *
      * @param  array  $column
      * @param  string  $boolean
+     * @param  string  $method
      * @return $this
      */
-    protected function addArrayOfWheres($column, $boolean)
+    protected function addArrayOfWheres($column, $boolean, $method = 'where')
     {
-        return $this->whereNested(function ($query) use ($column) {
+        return $this->whereNested(function ($query) use ($column, $method) {
             foreach ($column as $key => $value) {
                 if (is_numeric($key) && is_array($value)) {
-                    call_user_func_array([$query, 'where'], $value);
+                    call_user_func_array([$query, $method], $value);
                 } else {
-                    $query->where($key, '=', $value);
+                    $query->$method($key, '=', $value);
                 }
             }
         }, $boolean);
+    }
+
+    /**
+     * Determine if the given operator and value combination is legal.
+     *
+     * @param  string  $operator
+     * @param  mixed  $value
+     * @return bool
+     */
+    protected function invalidOperatorAndValue($operator, $value)
+    {
+        $isOperator = in_array($operator, $this->operators);
+
+        return is_null($value) && $isOperator && ! in_array($operator, ['=', '<>', '!=']);
     }
 
     /**
@@ -540,17 +599,49 @@ class Builder
     }
 
     /**
-     * Determine if the given operator and value combination is legal.
+     * Add a "where" clause comparing two columns to the query.
      *
-     * @param  string  $operator
-     * @param  mixed  $value
-     * @return bool
+     * @param  string|array  $first
+     * @param  string|null  $operator
+     * @param  string|null  $second
+     * @param  string|null  $boolean
+     * @return \Illuminate\Database\Query\Builder|static
      */
-    protected function invalidOperatorAndValue($operator, $value)
+    public function whereColumn($first, $operator = null, $second = null, $boolean = 'and')
     {
-        $isOperator = in_array($operator, $this->operators);
+        // If the column is an array, we will assume it is an array of key-value pairs
+        // and can add them each as a where clause. We will maintain the boolean we
+        // received when the method was called and pass it into the nested where.
+        if (is_array($first)) {
+            return $this->addArrayOfWheres($first, $boolean, 'whereColumn');
+        }
 
-        return $isOperator && $operator != '=' && is_null($value);
+        // If the given operator is not found in the list of valid operators we will
+        // assume that the developer is just short-cutting the '=' operators and
+        // we will set the operators to '=' and set the values appropriately.
+        if (! in_array(strtolower($operator), $this->operators, true) &&
+            ! in_array(strtolower($operator), $this->grammar->getOperators(), true)) {
+            list($second, $operator) = [$operator, '='];
+        }
+
+        $type = 'Column';
+
+        $this->wheres[] = compact('type', 'first', 'operator', 'second', 'boolean');
+
+        return $this;
+    }
+
+    /**
+     * Add an "or where" clause comparing two columns to the query.
+     *
+     * @param  string|array  $first
+     * @param  string|null  $operator
+     * @param  string|null  $second
+     * @return \Illuminate\Database\Query\Builder|static
+     */
+    public function orWhereColumn($first, $operator = null, $second = null)
+    {
+        return $this->whereColumn($first, $operator, $second, 'or');
     }
 
     /**
@@ -1198,10 +1289,10 @@ class Builder
      */
     public function orderBy($column, $direction = 'asc')
     {
-        $property = $this->unions ? 'unionOrders' : 'orders';
-        $direction = strtolower($direction) == 'asc' ? 'asc' : 'desc';
-
-        $this->{$property}[] = compact('column', 'direction');
+        $this->{$this->unions ? 'unionOrders' : 'orders'}[] = [
+            'column' => $column,
+            'direction' => strtolower($direction) == 'asc' ? 'asc' : 'desc',
+        ];
 
         return $this;
     }
@@ -1226,6 +1317,17 @@ class Builder
     public function oldest($column = 'created_at')
     {
         return $this->orderBy($column, 'asc');
+    }
+
+    /**
+     * Put the query's results in random order.
+     *
+     * @param  string  $seed
+     * @return $this
+     */
+    public function inRandomOrder($seed = '')
+    {
+        return $this->orderByRaw($this->grammar->compileRandom($seed));
     }
 
     /**
@@ -1312,6 +1414,26 @@ class Builder
     public function forPage($page, $perPage = 15)
     {
         return $this->skip(($page - 1) * $perPage)->take($perPage);
+    }
+
+    /**
+     * Constrain the query to the next "page" of results after a given ID.
+     *
+     * @param  int  $perPage
+     * @param  int  $lastId
+     * @param  string  $column
+     * @return \Illuminate\Database\Query\Builder|static
+     */
+    public function forPageAfterId($perPage = 15, $lastId = 0, $column = 'id')
+    {
+        $this->orders = Collection::make($this->orders)
+                ->reject(function ($order) use ($column) {
+                    return $order['column'] === $column;
+                })->values()->all();
+
+        return $this->where($column, '>', $lastId)
+                    ->orderBy($column, 'asc')
+                    ->take($perPage);
     }
 
     /**
@@ -1492,11 +1614,12 @@ class Builder
      * @param  int  $perPage
      * @param  array  $columns
      * @param  string  $pageName
+     * @param  int|null  $page
      * @return \Illuminate\Contracts\Pagination\Paginator
      */
-    public function simplePaginate($perPage = 15, $columns = ['*'], $pageName = 'page')
+    public function simplePaginate($perPage = 15, $columns = ['*'], $pageName = 'page', $page = null)
     {
-        $page = Paginator::resolveCurrentPage($pageName);
+        $page = $page ?: Paginator::resolveCurrentPage($pageName);
 
         $this->skip(($page - 1) * $perPage)->take($perPage + 1);
 
@@ -1585,11 +1708,27 @@ class Builder
     }
 
     /**
+     * Get a generator for the given query.
+     *
+     * @return \Generator
+     */
+    public function cursor()
+    {
+        if (is_null($this->columns)) {
+            $this->columns = ['*'];
+        }
+
+        return $this->connection->cursor(
+            $this->toSql(), $this->getBindings(), ! $this->useWritePdo
+        );
+    }
+
+    /**
      * Chunk the results of the query.
      *
      * @param  int  $count
      * @param  callable  $callback
-     * @return bool
+     * @return  bool
      */
     public function chunk($count, callable $callback)
     {
@@ -1606,6 +1745,33 @@ class Builder
             $page++;
 
             $results = $this->forPage($page, $count)->get();
+        }
+
+        return true;
+    }
+
+    /**
+     * Chunk the results of a query by comparing numeric IDs.
+     *
+     * @param  int  $count
+     * @param  callable  $callback
+     * @param  string  $column
+     * @return bool
+     */
+    public function chunkById($count, callable $callback, $column = 'id')
+    {
+        $lastId = null;
+
+        $results = $this->forPageAfterId($count, 0, $column)->get();
+
+        while (! empty($results)) {
+            if (call_user_func($callback, $results) === false) {
+                return false;
+            }
+
+            $lastId = last($results)->{$column};
+
+            $results = $this->forPageAfterId($count, $lastId, $column)->get();
         }
 
         return true;
@@ -1901,7 +2067,25 @@ class Builder
 
         $sql = $this->grammar->compileUpdate($this, $values);
 
-        return $this->connection->update($sql, $this->cleanBindings($bindings));
+        return $this->connection->update($sql, $this->cleanBindings(
+            $this->grammar->prepareBindingsForUpdate($bindings, $values)
+        ));
+    }
+
+    /**
+     * Insert or update a record matching the attributes, and fill it with values.
+     *
+     * @param  array  $attributes
+     * @param  array  $values
+     * @return bool
+     */
+    public function updateOrInsert(array $attributes, array $values = [])
+    {
+        if (! $this->where($attributes)->exists()) {
+            return $this->insert(array_merge($attributes, $values));
+        }
+
+        return (bool) $this->where($attributes)->take(1)->update($values);
     }
 
     /**
@@ -2156,7 +2340,7 @@ class Builder
             return $this->dynamicWhere($method, $parameters);
         }
 
-        $className = get_class($this);
+        $className = static::class;
 
         throw new BadMethodCallException("Call to undefined method {$className}::{$method}()");
     }

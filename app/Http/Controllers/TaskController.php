@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 
 use App\Task;
 use App\Repositories\TaskRepository;
+use DB;
 class TaskController extends Controller
 {
     /**
@@ -42,6 +43,11 @@ class TaskController extends Controller
         return view('tasks.index', [
             'tasks' => $this->tasks->forUser($request->user()),
         ]);
+    }
+
+    public function ehsan($id)
+    {
+        echo "ehsan" + $id;
     }
 
     /**

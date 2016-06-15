@@ -36,4 +36,6 @@ Route::group(['middleware' => ['web']], function () {
 
     Route::auth();
 
+    Route::get('/ehsan/{id}', 'TaskController@ehsan');
+
 });

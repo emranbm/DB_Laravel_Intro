@@ -187,8 +187,10 @@ class FilesystemManager implements FactoryContract
 
         $root = isset($s3Config['root']) ? $s3Config['root'] : null;
 
+        $options = isset($config['options']) ? $config['options'] : [];
+
         return $this->adapt($this->createFlysystem(
-            new S3Adapter(new S3Client($s3Config), $s3Config['bucket'], $root), $config
+            new S3Adapter(new S3Client($s3Config), $s3Config['bucket'], $root, $options), $config
         ));
     }
 
@@ -221,8 +223,10 @@ class FilesystemManager implements FactoryContract
             'username' => $config['username'], 'apiKey' => $config['key'],
         ]);
 
+        $root = isset($config['root']) ? $config['root'] : null;
+
         return $this->adapt($this->createFlysystem(
-            new RackspaceAdapter($this->getRackspaceContainer($client, $config)), $config
+            new RackspaceAdapter($this->getRackspaceContainer($client, $config), $root), $config
         ));
     }
 

@@ -18,6 +18,7 @@ class CreateTasksTable extends Migration
             $table->string('name');
             $table->timestamps();
             $table->integer('is_done');
+            $table->string('type');
         });
     }
 

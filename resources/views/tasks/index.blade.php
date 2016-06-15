@@ -66,7 +66,6 @@
                                                     <i class="fa fa-btn fa-trash"></i>Delete
                                                 </button>
                                                 <a href="/task_done/{{ $task->id }}" class="btn btn-success">Done</a>
-
                                             </form>
                                         </td>
                                     </tr>
