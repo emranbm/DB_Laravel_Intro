@@ -10,11 +10,9 @@
                 <div class="panel-body">
                     Please Login or register
                 </div>
+                <div class="panel-footer">Copyright by emran and sajad.</div>
             </div>
         </div>
     </div>
-</div>
-<div>
-	Copyright by emran and sajad.
 </div>
 @endsection

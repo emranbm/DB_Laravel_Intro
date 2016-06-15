@@ -58,13 +58,19 @@ class TaskController extends Controller
      */
     public function store(Request $request)
     {
+        $date = "";
+        $date = $request->year . "/" . $request->month . "/" . $request->day;
         $this->validate($request, [
             'name' => 'required|max:255',
         ]);
 
         $request->user()->tasks()->create([
             'name' => $request->name,
-            'is_done' => '0',
+            'state' => '0',
+            'type' => $request->type,
+            'co_worker' => $request->co_workers,
+            'day_estimation' => $request->time_estimation,
+            'start_date' => $date
         ]);
 
         return redirect('/tasks');
@@ -94,7 +100,7 @@ class TaskController extends Controller
      * @return Response
      */
     public function task_done(Request $request, Task $task){
-        $task->is_done = '1';
+        $task->state = '2';
         $task->save();
 
         return redirect('/tasks');
@@ -108,7 +114,14 @@ class TaskController extends Controller
      * @return Response
      */
     public function task_todo(Request $request, Task $task){
-        $task->is_done = '0';
+        $task->state = '0';
+        $task->save();
+
+        return redirect('/tasks');
+    }
+
+    public function task_doing(Request $request, Task $task){
+        $task->state = '1';
         $task->save();
 
         return redirect('/tasks');
